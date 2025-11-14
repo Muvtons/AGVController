@@ -730,6 +730,9 @@ AGVController::AGVController()
     : server(nullptr), webSocket(nullptr), dnsServer(nullptr),
       ap_ssid("AGV_Controller_Setup"), ap_password("12345678"),
       mdnsName("agvcontrol"), isAPMode(false), isAuthenticated(false) {
+    // Initialize the server and WebSocket objects
+    server = new WebServer(80);
+    webSocket = new WebSocketsServer(81);
 }
 
 AGVController::~AGVController() {
@@ -787,9 +790,10 @@ void AGVController::loop() {
             String msg = Serial.readStringUntil('\n');
             msg.trim();
             
-            if (msg.length() > 0) {
+            if (msg.length() > 0 && webSocket) {  // Add null check
                 Serial.println("\n[SERIAL -> WEB] Sending: " + msg);
-                webSocket->broadcastTXT(msg);
+                String message = msg;  // Create non-const copy
+                webSocket->broadcastTXT(message);
             }
         }
     }
@@ -910,9 +914,12 @@ void AGVController::webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload,
             
         case WStype_CONNECTED:
             {
-                IPAddress ip = webSocket->remoteIP(num);
-                Serial.printf("[WebSocket] Client #%u connected from %d.%d.%d.%d\n", num, ip[0], ip[1], ip[2], ip[3]);
-                webSocket->sendTXT(num, "ESP32 Connected - Ready for commands");
+                if (webSocket) {  // Add null check
+                    IPAddress ip = webSocket->remoteIP(num);
+                    Serial.printf("[WebSocket] Client #%u connected from %d.%d.%d.%d\n", num, ip[0], ip[1], ip[2], ip[3]);
+                    String msg = "ESP32 Connected - Ready for commands";
+                    webSocket->sendTXT(num, msg);
+                }
             }
             break;
             
@@ -922,8 +929,11 @@ void AGVController::webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload,
             Serial.printf("  %s\n", payload);
             Serial.println("========================================\n");
             
-            String response = "Received: " + String((char*)payload);
-            webSocket->sendTXT(num, response);
+            if (webSocket) {  // Add null check
+                String response = "Received: " + String((char*)payload);
+                String msg = response;  // Create non-const copy
+                webSocket->sendTXT(num, msg);
+            }
             break;
     }
 }
@@ -1051,4 +1061,5 @@ void AGVController::restart() {
     ESP.restart();
 
 }
+
 
