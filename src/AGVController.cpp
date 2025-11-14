@@ -1049,20 +1049,6 @@ String AGVController::getLocalIP() {
 
 void AGVController::restart() {
     ESP.restart();
-}
-
-bool AGVController::isConnected() {
-    return !isAPMode && WiFi.status() == WL_CONNECTED;
-}
-
-String AGVController::getLocalIP() {
-    if (WiFi.status() == WL_CONNECTED) {
-        return WiFi.localIP().toString();
-    }
-    return "0.0.0.0";
-}
-
-void AGVController::restart() {
-    ESP.restart();
 
 }
+
