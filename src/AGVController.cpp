@@ -1031,7 +1031,8 @@ void AGVController::handleCaptivePortal() {
 
 void AGVController::sendWebSocketMessage(const String& message) {
     if (webSocket && !isAPMode) {
-        webSocket->broadcastTXT(message);
+        String msg = message;  // Create a non-const copy
+        webSocket->broadcastTXT(msg);
     }
 }
 
@@ -1048,4 +1049,20 @@ String AGVController::getLocalIP() {
 
 void AGVController::restart() {
     ESP.restart();
+}
+
+bool AGVController::isConnected() {
+    return !isAPMode && WiFi.status() == WL_CONNECTED;
+}
+
+String AGVController::getLocalIP() {
+    if (WiFi.status() == WL_CONNECTED) {
+        return WiFi.localIP().toString();
+    }
+    return "0.0.0.0";
+}
+
+void AGVController::restart() {
+    ESP.restart();
+
 }
