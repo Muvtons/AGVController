@@ -739,14 +739,20 @@ void AGVController::begin(const char* adminUser, const char* adminPass) {
     preferences.end();
     
     Serial.println("\n[Storage] Checking saved WiFi credentials...");
+    Serial.print("  SSID: "); 
+    if (stored_ssid.length() > 0) {
+        Serial.println(stored_ssid);
+    } else {
+        Serial.println("❌ Not found");
+    }
     
     if (stored_ssid.length() > 0) {
         Serial.println("  ✅ Found saved credentials");
-        Serial.println("  Attempting to connect...");
+        Serial.println("  🚀 Attempting to connect to WiFi...");
         startStationMode();
     } else {
         Serial.println("  ⚠️  No saved credentials found");
-        Serial.println("  Starting AP mode for setup...");
+        Serial.println("  📡 Starting AP mode for setup...");
         startAPMode();
     }
 }
@@ -754,6 +760,7 @@ void AGVController::begin(const char* adminUser, const char* adminPass) {
 void AGVController::loop() {
     if (isAPMode && dnsServer) {
         dnsServer->processNextRequest();
+        Serial.println("🔍 Processing DNS request (AP mode)");
     }
     
     if (server) {
@@ -769,9 +776,12 @@ void AGVController::loop() {
             msg.trim();
             
             if (msg.length() > 0 && webSocket) {  // Add null check
-                Serial.println("\n[SERIAL -> WEB] Sending: " + msg);
+                Serial.println("\n[SERIAL -> WEB] Broadcasting: " + msg);
                 String message = msg;  // Create non-const copy
                 webSocket->broadcastTXT(message);
+                
+                // Visualize the message being sent
+                Serial.println("   📡 Broadcasted to all connected clients");
             }
         }
     }
@@ -781,7 +791,7 @@ void AGVController::loop() {
 
 void AGVController::startAPMode() {
     Serial.println("\n========================================");
-    Serial.println("  STARTING ACCESS POINT MODE");
+    Serial.println("  📡 STARTING ACCESS POINT MODE");
     Serial.println("========================================");
     
     WiFi.mode(WIFI_AP);
@@ -790,22 +800,26 @@ void AGVController::startAPMode() {
     IPAddress IP = WiFi.softAPIP();
     Serial.print("📡 AP IP address: ");
     Serial.println(IP);
-    Serial.println("\n  Network Name: " + String(ap_ssid));
-    Serial.println("  Password: " + String(ap_password));
-    Serial.println("\n  Connect to this network and");
-    Serial.println("  open browser - you'll be redirected");
-    Serial.println("  to setup page automatically!");
+    Serial.println("\n  🌐 Network Name: " + String(ap_ssid));
+    Serial.println("  🔐 Password: " + String(ap_password));
+    Serial.println("\n  📋 Connect to this network and");
+    Serial.println("     open browser - you'll be redirected");
+    Serial.println("     to setup page automatically!");
     Serial.println("========================================\n");
     
     // Start DNS server for captive portal
     if (!dnsServer) {
+        Serial.println("🔧 Initializing DNS server...");
         dnsServer = new DNSServer();
     }
     dnsServer->start(53, "*", WiFi.softAPIP());
+    Serial.println("✅ DNS server started - Captive portal active");
     
     isAPMode = true;
+    Serial.println("🔄 AP mode flag set to TRUE");
     
     // Setup routes for AP mode
+    Serial.println("🔗 Setting up AP mode routes...");
     server->on("/", HTTP_GET, std::bind(&AGVController::handleWiFiSetup, this));
     server->on("/setup", HTTP_GET, std::bind(&AGVController::handleWiFiSetup, this));
     server->on("/scan", HTTP_GET, std::bind(&AGVController::handleScan, this));
@@ -814,18 +828,22 @@ void AGVController::startAPMode() {
     
     server->begin();
     Serial.println("✅ Web server started in AP mode");
+    Serial.println("🌐 AP mode web interface ready");
 }
 
 void AGVController::startStationMode() {
     Serial.println("\n========================================");
-    Serial.println("  STARTING STATION MODE");
+    Serial.println("  🌐 STARTING STATION MODE");
     Serial.println("========================================");
     
     WiFi.mode(WIFI_STA);
+    Serial.print("🔌 Connecting to WiFi: ");
+    Serial.println(stored_ssid);
+    
     WiFi.begin(stored_ssid.c_str(), stored_password.c_str());
     
-    Serial.print("Connecting to: ");
-    Serial.println(stored_ssid);
+    Serial.println("🔄 Attempting connection...");
+    Serial.print("  ");
     
     int attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 20) {
@@ -835,15 +853,21 @@ void AGVController::startStationMode() {
     }
     
     if (WiFi.status() == WL_CONNECTED) {
-        Serial.println("\n\n✅ WiFi Connected!");
+        Serial.println("\n\n🎉 WiFi Connection SUCCESSFUL!");
         Serial.print("📡 IP Address: ");
         Serial.println(WiFi.localIP());
+        Serial.print("📶 Signal Strength: ");
+        Serial.print(WiFi.RSSI());
+        Serial.println(" dBm");
+        Serial.print("🔒 Encryption: ");
+        Serial.println(WiFi.encryptionType() == WIFI_AUTH_OPEN ? "None" : "Secured");
         
         // Start mDNS
+        Serial.println("🔧 Starting mDNS service...");
         if (MDNS.begin(mdnsName)) {
-            Serial.println("\n✅ mDNS started!");
+            Serial.println("\n✅ mDNS started successfully!");
             Serial.println("========================================");
-            Serial.println("  ACCESS YOUR AGV CONTROLLER:");
+            Serial.println("  🚀 ACCESS YOUR AGV CONTROLLER:");
             Serial.print("  🌐 http://");
             Serial.print(mdnsName);
             Serial.println(".local");
@@ -852,34 +876,40 @@ void AGVController::startStationMode() {
             Serial.println("========================================");
             
             MDNS.addService("http", "tcp", 80);
+            Serial.println("📋 mDNS HTTP service registered");
+        } else {
+            Serial.println("❌ mDNS failed to start");
         }
         
         isAPMode = false;
+        Serial.println("🔄 Station mode flag set to TRUE");
         
         // Setup routes for Station mode
+        Serial.println("🔗 Setting up Station mode routes...");
         server->on("/", HTTP_GET, std::bind(&AGVController::handleRoot, this));
         server->on("/login", HTTP_POST, std::bind(&AGVController::handleLogin, this));
         server->on("/dashboard", HTTP_GET, std::bind(&AGVController::handleDashboard, this));
         
         server->begin();
-        Serial.println("\n✅ Web server started in Station mode");
+        Serial.println("✅ Web server started in Station mode");
         
         // Start WebSocket
+        Serial.println("🔌 Starting WebSocket server...");
         webSocket->begin();
         webSocket->onEvent(std::bind(&AGVController::webSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
         Serial.println("✅ WebSocket server started (Port 81)");
         
         Serial.println("\n========================================");
-        Serial.println("  SYSTEM READY");
+        Serial.println("  🎉 SYSTEM READY");
         Serial.println("========================================");
-        Serial.println("Default Login:");
-        Serial.println("  Username: " + admin_username);
-        Serial.println("  Password: " + admin_password);
+        Serial.println("📋 Default Login Credentials:");
+        Serial.println("  📧 Username: " + admin_username);
+        Serial.println("  🔐 Password: " + admin_password);
         Serial.println("========================================\n");
         
     } else {
-        Serial.println("\n\n❌ WiFi connection failed!");
-        Serial.println("Starting AP mode for setup...\n");
+        Serial.println("\n\n❌ WiFi connection FAILED!");
+        Serial.println("  🔄 Falling back to AP mode for setup...");
         startAPMode();
     }
 }
@@ -894,9 +924,10 @@ void AGVController::webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload,
             {
                 if (webSocket) {  // Add null check
                     IPAddress ip = webSocket->remoteIP(num);
-                    Serial.printf("[WebSocket] Client #%u connected from %d.%d.%d.%d\n", num, ip[0], ip[1], ip[2], ip[3]);
+                    Serial.printf("[WebSocket] Client #%u connected from %s\n", num, ip.toString().c_str());
                     String msg = "ESP32 Connected - Ready for commands";
                     webSocket->sendTXT(num, msg);
+                    Serial.println("   📡 Sent welcome message to client");
                 }
             }
             break;
@@ -904,13 +935,14 @@ void AGVController::webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload,
         case WStype_TEXT:
             Serial.println("\n========================================");
             Serial.println("[WEB -> SERIAL] Command Received:");
-            Serial.printf("  %s\n", payload);
+            Serial.printf("  📤 %s\n", payload);
             Serial.println("========================================\n");
             
             if (webSocket) {  // Add null check
                 String response = "Received: " + String((char*)payload);
                 String msg = response;  // Create non-const copy
                 webSocket->sendTXT(num, msg);
+                Serial.println("   📡 Echoed command back to sender");
             }
             break;
     }
@@ -925,12 +957,16 @@ String AGVController::getSessionToken() {
 }
 
 void AGVController::handleRoot() {
+    Serial.println("🌐 [HTTP] Root page requested - Sending login page");
     server->send_P(200, "text/html", loginPage);
+    Serial.println("   📄 Login page sent to client");
 }
 
 void AGVController::handleLogin() {
     if (server->method() == HTTP_POST) {
         String body = server->arg("plain");
+        Serial.println("\n[AUTH] Login attempt received:");
+        Serial.println("  📄 Raw request: " + body);
         
         // Parse JSON manually (simple approach)
         int userStart = body.indexOf("\"username\":\"") + 12;
@@ -941,35 +977,48 @@ void AGVController::handleLogin() {
         int passEnd = body.indexOf("\"", passStart);
         String password = body.substring(passStart, passEnd);
         
-        Serial.println("\n[AUTH] Login attempt:");
-        Serial.println("  Username: " + username);
+        Serial.println("  📧 Username: " + username);
+        Serial.println("  🔐 Password: " + password);
         
         if (username == admin_username && password == admin_password) {
             sessionToken = getSessionToken();
             String response = "{\"success\":true,\"token\":\"" + sessionToken + "\"}";
             server->send(200, "application/json", response);
-            Serial.println("  ✅ Login successful");
+            Serial.println("  ✅ Login SUCCESSFUL - Token generated");
+            Serial.println("  🎫 Session token: " + sessionToken);
         } else {
             server->send(200, "application/json", "{\"success\":false}");
-            Serial.println("  ❌ Login failed");
+            Serial.println("  ❌ Login FAILED - Invalid credentials");
         }
     }
 }
 
 void AGVController::handleDashboard() {
+    Serial.println("🌐 [HTTP] Dashboard requested - Sending main page");
     server->send_P(200, "text/html", mainPage);
+    Serial.println("   📄 Main dashboard page sent to client");
 }
 
 void AGVController::handleWiFiSetup() {
+    Serial.println("🌐 [HTTP] WiFi setup page requested");
     server->send_P(200, "text/html", wifiSetupPage);
+    Serial.println("   📄 WiFi setup page sent to client");
 }
 
 void AGVController::handleScan() {
-    Serial.println("\n[WiFi] Scanning networks...");
+    Serial.println("\n[WiFi] Scanning for available networks...");
     int n = WiFi.scanNetworks();
     String json = "[";
     
+    Serial.printf("  📡 Found %d networks:\n", n);
+    
     for (int i = 0; i < n; i++) {
+        Serial.printf("    %d. %s (RSSI: %d dBm, %s)\n", 
+                      i+1, 
+                      WiFi.SSID(i).c_str(), 
+                      WiFi.RSSI(i), 
+                      WiFi.encryptionType(i) != WIFI_AUTH_OPEN ? "Secured" : "Open");
+        
         if (i > 0) json += ",";
         json += "{";
         json += "\"ssid\":\"" + WiFi.SSID(i) + "\",";
@@ -980,12 +1029,14 @@ void AGVController::handleScan() {
     
     json += "]";
     server->send(200, "application/json", json);
-    Serial.printf("  Found %d networks\n", n);
+    Serial.println("  📤 Network list sent to client");
 }
 
 void AGVController::handleSaveWiFi() {
     if (server->method() == HTTP_POST) {
         String body = server->arg("plain");
+        Serial.println("\n[WiFi] Save WiFi credentials request:");
+        Serial.println("  📄 Raw request: " + body);
         
         int ssidStart = body.indexOf("\"ssid\":\"") + 8;
         int ssidEnd = body.indexOf("\"", ssidStart);
@@ -995,47 +1046,64 @@ void AGVController::handleSaveWiFi() {
         int passEnd = body.indexOf("\"", passStart);
         String password = body.substring(passStart, passEnd);
         
-        Serial.println("\n[WiFi] Saving credentials:");
-        Serial.println("  SSID: " + ssid);
+        Serial.println("  🌐 SSID: " + ssid);
+        Serial.println("  🔐 Password: " + password);
         
         // Save to preferences
+        Serial.println("  💾 Saving credentials to flash memory...");
         preferences.begin("wifi", false);
         preferences.putString("ssid", ssid);
         preferences.putString("password", password);
         preferences.end();
         
         server->send(200, "application/json", "{\"success\":true}");
+        Serial.println("  ✅ Credentials saved successfully");
         
-        Serial.println("  ✅ Credentials saved. Restarting...");
+        Serial.println("  🔄 Restarting ESP32 to apply new WiFi settings...");
+        Serial.println("  ⏰ Will restart in 1 second...");
         delay(1000);
         ESP.restart();
     }
 }
 
 void AGVController::handleCaptivePortal() {
+    Serial.println("🌐 [HTTP] Captive portal redirect triggered");
     server->sendHeader("Location", "http://192.168.4.1/setup", true);
     server->send(302, "text/plain", "");
+    Serial.println("   📄 Redirected to WiFi setup page");
 }
 
 void AGVController::sendWebSocketMessage(const String& message) {
     if (webSocket && !isAPMode) {
+        Serial.println("[WebSocket] Broadcasting message: " + message);
         String msg = message;  // Create a non-const copy
         webSocket->broadcastTXT(msg);
+        Serial.println("   📡 Message sent to all connected clients");
+    } else {
+        Serial.println("[WebSocket] Skipped broadcast - AP mode active or WebSocket null");
     }
 }
 
 bool AGVController::isConnected() {
-    return !isAPMode && WiFi.status() == WL_CONNECTED;
+    bool connected = !isAPMode && WiFi.status() == WL_CONNECTED;
+    Serial.print("[WiFi] Connection status: ");
+    Serial.println(connected ? "Connected" : "Disconnected");
+    return connected;
 }
 
 String AGVController::getLocalIP() {
     if (WiFi.status() == WL_CONNECTED) {
-        return WiFi.localIP().toString();
+        String ip = WiFi.localIP().toString();
+        Serial.println("[WiFi] Local IP: " + ip);
+        return ip;
     }
+    Serial.println("[WiFi] No connection - returning 0.0.0.0");
     return "0.0.0.0";
 }
 
 void AGVController::restart() {
+    Serial.println("🔄 [System] Restart command received");
+    Serial.println("  ⏰ ESP32 will restart in 1 second...");
+    delay(1000);
     ESP.restart();
-
 }
