@@ -642,27 +642,6 @@ const char mainPage[] PROGMEM = R"rawliteral(
             addLog('📤 Sent: ' + command);
         }
 
-        function generatePath(sourceX, sourceY, destX, destY) {
-            let path = '';
-            let currentX = sourceX;
-            let currentY = sourceY;
-            
-            while (currentX !== destX) {
-                const dir = (currentX < destX) ? 'E' : 'W';
-                path += `(${currentX},${currentY})${dir}`;
-                currentX += (currentX < destX) ? 1 : -1;
-            }
-            
-            while (currentY !== destY) {
-                const dir = (currentY < destY) ? 'N' : 'S';
-                path += `(${currentX},${currentY})${dir}`;
-                currentY += (currentY < destY) ? 1 : -1;
-            }
-            
-            path += `(${currentX},${currentY})E`;
-            return path;
-        }
-
         function toggleLoopCount() {
             const loopRadio = document.getElementById('loop');
             const loopCountContainer = document.getElementById('loopCountContainer');
@@ -682,13 +661,12 @@ const char mainPage[] PROGMEM = R"rawliteral(
             const mode = document.querySelector('input[name="mode"]:checked').value;
             const loopCount = document.getElementById('loopCount').value;
             
-            const path = generatePath(sourceX, sourceY, destX, destY);
-            
+            // Send only source and destination coordinates
             let command;
             if (mode === 'loop') {
-                command = `PATH:${path}:LOOP:${loopCount}`;
+                command = `SRC:(${sourceX},${sourceY}):DST:(${destX},${destY}):LOOP:${loopCount}`;
             } else {
-                command = `PATH:${path}:ONCE`;
+                command = `SRC:(${sourceX},${sourceY}):DST:(${destX},${destY}):ONCE`;
             }
             
             sendCommand(command);
@@ -1061,5 +1039,3 @@ void AGVController::restart() {
     ESP.restart();
 
 }
-
-
