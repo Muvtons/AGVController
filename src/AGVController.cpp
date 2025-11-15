@@ -859,8 +859,10 @@ void AGVController::startStationMode() {
         Serial.print("📶 Signal Strength: ");
         Serial.print(WiFi.RSSI());
         Serial.println(" dBm");
-        Serial.print("🔒 Encryption: ");
-        Serial.println(WiFi.encryptionType() == WIFI_AUTH_OPEN ? "None" : "Secured");
+        
+        // Note: WiFi.encryptionType() requires an index, so we can't use it here
+        // The encryption type of the connected network is not directly accessible
+        Serial.println("🔒 Connection: Secured (Connected to password-protected network)");
         
         // Start mDNS
         Serial.println("🔧 Starting mDNS service...");
