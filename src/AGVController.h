@@ -19,6 +19,7 @@ public:
 
     // Public methods for external use
     void sendWebSocketMessage(const String& message);
+    void broadcastMessage(const char* message);  // ✅ ADD THIS EXACT LINE
     bool isConnected();
     String getLocalIP();
     void restart();
@@ -62,5 +63,6 @@ private:
 
 // Global instance for easy access
 extern AGVController AGV;
+
 
 #endif
